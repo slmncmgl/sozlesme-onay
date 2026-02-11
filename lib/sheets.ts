@@ -1,3 +1,42 @@
+import { google } from 'googleapis';
+
+const auth = new google.auth.GoogleAuth({
+  credentials: {
+    client_email: process.env.GOOGLE_SHEETS_CLIENT_EMAIL,
+    private_key: process.env.GOOGLE_SHEETS_PRIVATE_KEY?.replace(/\\n/g, '\n'),
+  },
+  scopes: ['https://www.googleapis.com/auth/spreadsheets'],
+});
+
+const sheets = google.sheets({ version: 'v4', auth });
+
+export async function getContractByToken(token: string) {
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId: process.env.GOOGLE_SPREADSHEET_ID,
+    range: 'Sözleşme Onayları!A2:L1000',
+  });
+
+  const rows = response.data.values || [];
+  const row = rows.find(r => r[0] === token);
+  
+  if (!row) return null;
+  
+  return {
+    tally_submission_id: row[0],
+    approval_status: row[1],
+    approved_at: row[2],
+    approved_ip: row[3],
+    approved_by: row[4],
+    contract_version: row[5],
+    contract_html_url: row[10],
+    student_tc_no: row[6],
+    student_name: row[7],
+    danisman_tc_no: row[8],
+    danisman_adi: row[9],
+    notes: row[11],
+  };
+}
+
 export async function updateApprovalStatus(token: string, ip: string, fullName: string) {
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId: process.env.GOOGLE_SPREADSHEET_ID,
@@ -11,45 +50,17 @@ export async function updateApprovalStatus(token: string, ip: string, fullName: 
   
   const actualRow = rowIndex + 2;
   
-  // L kolonu = approved_by (index 11)
   await sheets.spreadsheets.values.update({
     spreadsheetId: process.env.GOOGLE_SPREADSHEET_ID,
-    range: `Sözleşme Onayları!B${actualRow}:E${actualRow}`,  // ← D'den E'ye genişlet
+    range: `Sözleşme Onayları!B${actualRow}:E${actualRow}`,
     valueInputOption: 'USER_ENTERED',
     requestBody: {
       values: [[
-        'APPROVED',           // B: approval_status
-        new Date().toISOString(),  // C: approved_at
-        ip,                   // D: approved_ip
-        fullName              // E: approved_by ← YENİ!
+        'APPROVED',
+        new Date().toISOString(),
+        ip,
+        fullName
       ]]
     }
   });
 }
-```
-
----
-
-## 📊 **4. Google Sheet'e Kolon Ekle**
-
-**"Sözleşme Onayları" sekmesinde E kolonu:**
-```
-A: tally_submission_id
-B: approval_status
-C: approved_at
-D: approved_ip
-E: approved_by  ← YENİ KOLON EKLE!
-F: contract_version
-...
-```
-
----
-
-## 🎯 **SONUÇ:**
-```
-Kullanıcı:
-  1. Scroll → En alta
-  2. Input görünür: "Adınız Soyadınız"
-  3. Yazar: "Ahmet Yılmaz"
-  4. Buton: "Onaylıyorum"
-  5. Sheet'te: approved_by = "Ahmet Yılmaz" ✅
