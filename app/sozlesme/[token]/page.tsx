@@ -1,6 +1,3 @@
-// State ekle (en üstte)
-const [fullName, setFullName] = useState("");
-
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -21,6 +18,7 @@ export default function ContractPage({ params }: { params: { token: string } }) 
   const [scrolledToBottom, setScrolledToBottom] = useState(false);
   const [approving, setApproving] = useState(false);
   const [approved, setApproved] = useState(false);
+  const [fullName, setFullName] = useState("");  // ← YENİ!
 
   const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -83,41 +81,37 @@ export default function ContractPage({ params }: { params: { token: string } }) 
     };
   }, [loading, contract]);
 
-  // State ekle (en üstte)
-const [fullName, setFullName] = useState("");
-
-// approve fonksiyonunu güncelle
-async function approve() {
-  if (!fullName.trim()) {
-    setErr("Lütfen adınızı soyadınızı girin.");
-    return;
-  }
-
-  setApproving(true);
-  setErr(null);
-
-  try {
-    const res = await fetch(`/api/approve`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ 
-        token,
-        full_name: fullName.trim()  // ← YENİ!
-      }),
-    });
-
-    if (!res.ok) {
-      const t = await res.text().catch(() => "");
-      throw new Error(t || `Approve failed (${res.status})`);
+  async function approve() {
+    if (!fullName.trim()) {  // ← YENİ KONTROL!
+      setErr("Lütfen adınızı soyadınızı girin.");
+      return;
     }
 
-    setApproved(true);
-  } catch (e: any) {
-    setErr(e?.message || "Bilinmeyen hata");
-  } finally {
-    setApproving(false);
+    setApproving(true);
+    setErr(null);
+
+    try {
+      const res = await fetch(`/api/approve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ 
+          token,
+          full_name: fullName.trim()  // ← YENİ PARAMETRE!
+        }),
+      });
+
+      if (!res.ok) {
+        const t = await res.text().catch(() => "");
+        throw new Error(t || `Approve failed (${res.status})`);
+      }
+
+      setApproved(true);
+    } catch (e: any) {
+      setErr(e?.message || "Bilinmeyen hata");
+    } finally {
+      setApproving(false);
+    }
   }
-}
 
   const normalizedHtml = useMemo(() => {
     const html = contract?.contract_html ?? "";
@@ -125,15 +119,8 @@ async function approve() {
 
     const style = `
       <style>
-        /* Reset */
         * { margin: 0; padding: 0; box-sizing: border-box; }
         html, body { background: #f5f5f5; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        
-        /* A4 Container */
-        body {
-          padding: 0 !important;
-          margin: 0 !important;
-        }
         
         .a4-page {
           width: 210mm;
@@ -144,7 +131,6 @@ async function approve() {
           box-shadow: 0 0 10px rgba(0,0,0,0.1);
         }
         
-        /* Typography */
         p, div, span, li {
           font-size: 11pt;
           line-height: 1.6;
@@ -157,7 +143,6 @@ async function approve() {
           color: #000;
         }
         
-        /* Tables */
         table {
           width: 100% !important;
           border-collapse: collapse;
@@ -169,21 +154,15 @@ async function approve() {
           border: 1px solid #ddd;
         }
         
-        /* Images */
         img {
           max-width: 100%;
           height: auto;
         }
         
-        /* Lists */
         ul, ol {
           margin-left: 20pt;
           margin-bottom: 12pt;
         }
-        
-        /* Override Google Docs inline styles */
-        [style*="padding-left"] { padding-left: 0 !important; }
-        [style*="padding-right"] { padding-right: 0 !important; }
       </style>
     `;
 
@@ -207,7 +186,6 @@ async function approve() {
     }}>
       <div style={{ maxWidth: "900px", margin: "0 auto" }}>
         
-        {/* Header */}
         <div style={{ 
           textAlign: "center", 
           marginBottom: "32px",
@@ -251,7 +229,6 @@ async function approve() {
           </div>
         ) : (
           <>
-            {/* A4 Scroll Container */}
             <div
               ref={containerRef}
               style={{
@@ -273,7 +250,6 @@ async function approve() {
               />
             </div>
 
-            {/* Action Area */}
             <div style={{ 
               marginTop: "24px",
               background: "white",
@@ -285,7 +261,6 @@ async function approve() {
               gap: "16px"
             }}>
               
-              {/* Status */}
               <div style={{
                 display: "flex",
                 alignItems: "center",
@@ -298,65 +273,65 @@ async function approve() {
                   {scrolledToBottom ? "✓" : "↓"}
                 </span>
                 {scrolledToBottom 
-                  ? "Sözleşmeyi tamamen okudunuz, onaylayabilirsiniz" 
+                  ? "Sözleşmeyi tamamen okudunuz" 
                   : "Lütfen sözleşmeyi sonuna kadar okuyun"}
               </div>
-{/* İmza Input - Scroll en alta gelince görünür */}
-{scrolledToBottom && !approved && (
-  <div style={{
-    marginBottom: "16px",
-    padding: "16px",
-    background: "#f0f9ff",
-    borderRadius: "12px",
-    border: "1px solid #bae6fd"
-  }}>
-    <label style={{
-      display: "block",
-      marginBottom: "8px",
-      fontSize: "14px",
-      fontWeight: "600",
-      color: "#0c4a6e"
-    }}>
-      ✍️ İmza (Adınız Soyadınız)
-    </label>
-    <input
-      type="text"
-      value={fullName}
-      onChange={(e) => setFullName(e.target.value)}
-      placeholder="Örn: Ahmet Yılmaz"
-      style={{
-        width: "100%",
-        padding: "12px 16px",
-        borderRadius: "8px",
-        border: "2px solid #bae6fd",
-        fontSize: "15px",
-        outline: "none",
-        transition: "border-color 0.2s"
-      }}
-      onFocus={(e) => e.target.style.borderColor = "#0ea5e9"}
-      onBlur={(e) => e.target.style.borderColor = "#bae6fd"}
-    />
-  </div>
-)}
-              {/* Button */}
+
+              {/* ✅ İMZA INPUT ALANI - SCROLL EN ALTA GELİNCE GÖRÜNÜR */}
+              {scrolledToBottom && !approved && (
+                <div style={{
+                  padding: "16px",
+                  background: "#f0f9ff",
+                  borderRadius: "12px",
+                  border: "2px solid #bae6fd"
+                }}>
+                  <label style={{
+                    display: "block",
+                    marginBottom: "8px",
+                    fontSize: "14px",
+                    fontWeight: "600",
+                    color: "#0c4a6e"
+                  }}>
+                    ✍️ İmza (Adınız Soyadınız)
+                  </label>
+                  <input
+                    type="text"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    placeholder="Örn: Ahmet Yılmaz"
+                    style={{
+                      width: "100%",
+                      padding: "12px 16px",
+                      borderRadius: "8px",
+                      border: "2px solid #bae6fd",
+                      fontSize: "15px",
+                      outline: "none",
+                      transition: "border-color 0.2s"
+                    }}
+                    onFocus={(e) => (e.target as HTMLInputElement).style.borderColor = "#0ea5e9"}
+                    onBlur={(e) => (e.target as HTMLInputElement).style.borderColor = "#bae6fd"}
+                  />
+                </div>
+              )}
+
               <button
                 onClick={approve}
-                disabled={!scrolledToBottom || approving || approved}
+                disabled={!scrolledToBottom || approving || approved || !fullName.trim()}
                 style={{
                   padding: "16px 32px",
                   borderRadius: "12px",
                   border: "none",
                   fontSize: "16px",
                   fontWeight: "700",
-                  cursor: !scrolledToBottom || approving || approved ? "not-allowed" : "pointer",
+                  cursor: (!scrolledToBottom || approving || approved || !fullName.trim()) ? "not-allowed" : "pointer",
                   background: approved 
                     ? "#10b981" 
-                    : !scrolledToBottom || approving 
+                    : (!scrolledToBottom || approving || !fullName.trim())
                       ? "#d1d5db" 
                       : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
                   color: "white",
                   transition: "all 0.3s ease",
-                  boxShadow: !scrolledToBottom || approving || approved 
+                  boxShadow: (!scrolledToBottom || approving || approved || !fullName.trim())
                     ? "none" 
                     : "0 4px 12px rgba(102, 126, 234, 0.4)",
                 }}
