@@ -21,8 +21,6 @@ export default function ContractPage({ params }: { params: { token: string } }) 
 
   const containerRef = useRef<HTMLDivElement | null>(null);
 
-  const title = useMemo(() => "Bilimevi Sözleşme Onayı", []);
-
   useEffect(() => {
     let cancelled = false;
 
@@ -66,7 +64,7 @@ export default function ContractPage({ params }: { params: { token: string } }) 
       const el = containerRef.current;
       if (!el) return;
 
-      const thresholdPx = 12;
+      const thresholdPx = 20;
       const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - thresholdPx;
       setScrolledToBottom(atBottom);
     }
@@ -106,95 +104,242 @@ export default function ContractPage({ params }: { params: { token: string } }) 
     }
   }
 
-  // ✅ normalize burada: state’ten gelen HTML'i güvenli şekilde ekrana sığdır
   const normalizedHtml = useMemo(() => {
     const html = contract?.contract_html ?? "";
     if (!html) return "";
 
-    return html
-      .replace(
-        /<\/head>/i,
-        `<style>
-          html, body { max-width: 100%; overflow-x: hidden; }
-          img, table { max-width: 100% !important; height: auto !important; }
-          * { max-width: 100% !important; box-sizing: border-box; }
-          body { margin: 0; padding: 0; }
-          p, div, span { white-space: normal !important; overflow-wrap: anywhere; word-break: break-word; }
-        </style></head>`
-      )
-      .replace(/width:\s*\d+(px|pt);?/gi, "width:auto;")
-      .replace(/max-width:\s*\d+(px|pt);?/gi, "max-width:100%;");
+    const style = `
+      <style>
+        /* Reset */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        html, body { background: #f5f5f5; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        
+        /* A4 Container */
+        body {
+          padding: 0 !important;
+          margin: 0 !important;
+        }
+        
+        .a4-page {
+          width: 210mm;
+          min-height: 297mm;
+          padding: 20mm;
+          margin: 0 auto;
+          background: white;
+          box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        
+        /* Typography */
+        p, div, span, li {
+          font-size: 11pt;
+          line-height: 1.6;
+          text-align: justify;
+          color: #1a1a1a;
+        }
+        
+        h1, h2, h3, strong, b {
+          font-weight: 700;
+          color: #000;
+        }
+        
+        /* Tables */
+        table {
+          width: 100% !important;
+          border-collapse: collapse;
+          margin: 12pt 0;
+        }
+        
+        td, th {
+          padding: 8pt;
+          border: 1px solid #ddd;
+        }
+        
+        /* Images */
+        img {
+          max-width: 100%;
+          height: auto;
+        }
+        
+        /* Lists */
+        ul, ol {
+          margin-left: 20pt;
+          margin-bottom: 12pt;
+        }
+        
+        /* Override Google Docs inline styles */
+        [style*="padding-left"] { padding-left: 0 !important; }
+        [style*="padding-right"] { padding-right: 0 !important; }
+      </style>
+    `;
+
+    const withStyle = html.toLowerCase().includes("</head>")
+      ? html.replace(/<\/head>/i, `${style}</head>`)
+      : `${style}${html}`;
+
+    if (withStyle.toLowerCase().includes("<body")) {
+      return withStyle.replace(/<body([^>]*)>/i, `<body$1><div class="a4-page">`)
+                      .replace(/<\/body>/i, `</div></body>`);
+    }
+
+    return `<div class="a4-page">${withStyle}</div>`;
   }, [contract?.contract_html]);
 
   return (
-    <div style={{ minHeight: "100vh", background: "#f5f6fa", padding: 24 }}>
-      <div style={{ maxWidth: 900, margin: "0 auto" }}>
-        <h1 style={{ margin: "0 0 8px 0" }}>{title}</h1>
-
-        <div style={{ marginBottom: 12, color: "#666", fontSize: 14 }}>
-          Token: <code>{token}</code>
+    <div style={{ 
+      minHeight: "100vh", 
+      background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)", 
+      padding: "40px 20px" 
+    }}>
+      <div style={{ maxWidth: "900px", margin: "0 auto" }}>
+        
+        {/* Header */}
+        <div style={{ 
+          textAlign: "center", 
+          marginBottom: "32px",
+          color: "white"
+        }}>
+          <h1 style={{ 
+            fontSize: "32px", 
+            fontWeight: "700",
+            marginBottom: "8px",
+            textShadow: "0 2px 4px rgba(0,0,0,0.2)"
+          }}>
+            Bilimevi Sözleşme Onayı
+          </h1>
+          <p style={{ fontSize: "14px", opacity: 0.9 }}>
+            Lütfen sözleşmeyi dikkatle okuyun ve en alta kaydırarak onaylayın
+          </p>
         </div>
 
         {loading ? (
-          <div style={{ padding: 16, background: "white", borderRadius: 12 }}>Yükleniyor...</div>
+          <div style={{ 
+            padding: "48px", 
+            background: "white", 
+            borderRadius: "16px",
+            textAlign: "center",
+            boxShadow: "0 8px 32px rgba(0,0,0,0.12)"
+          }}>
+            <div style={{ fontSize: "18px", color: "#666" }}>Sözleşme yükleniyor...</div>
+          </div>
         ) : err ? (
-          <div style={{ padding: 16, background: "white", borderRadius: 12, border: "1px solid #f2c2c2" }}>
-            <div style={{ color: "#b00020", fontWeight: 600, marginBottom: 8 }}>Hata</div>
-            <div style={{ whiteSpace: "pre-wrap" }}>{err}</div>
+          <div style={{ 
+            padding: "32px", 
+            background: "white", 
+            borderRadius: "16px",
+            border: "2px solid #ef4444",
+            boxShadow: "0 8px 32px rgba(0,0,0,0.12)"
+          }}>
+            <div style={{ color: "#ef4444", fontWeight: "700", marginBottom: "12px", fontSize: "18px" }}>
+              ⚠️ Hata Oluştu
+            </div>
+            <div style={{ color: "#666", whiteSpace: "pre-wrap" }}>{err}</div>
           </div>
         ) : (
           <>
-            {/* ✅ Scroll alanı */}
+            {/* A4 Scroll Container */}
             <div
               ref={containerRef}
               style={{
                 height: "70vh",
                 overflowY: "auto",
                 overflowX: "hidden",
-                background: "white",
-                borderRadius: 12,
-                padding: 16,
-                boxShadow: "0 6px 18px rgba(0,0,0,0.08)",
-                border: "1px solid #eee",
+                background: "#f5f5f5",
+                borderRadius: "16px",
+                boxShadow: "0 8px 32px rgba(0,0,0,0.12)",
+                padding: "20px",
               }}
             >
               <div
                 style={{
                   width: "100%",
                   overflowX: "hidden",
-                  wordBreak: "break-word",
-                  overflowWrap: "anywhere",
-                  fontSize: 15,
-                  lineHeight: "24px",
                 }}
                 dangerouslySetInnerHTML={{ __html: normalizedHtml }}
               />
             </div>
 
-            {/* ✅ Buton alanı (scroll container DIŞINDA) */}
-            <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 16 }}>
+            {/* Action Area */}
+            <div style={{ 
+              marginTop: "24px",
+              background: "white",
+              padding: "24px",
+              borderRadius: "16px",
+              boxShadow: "0 8px 32px rgba(0,0,0,0.12)",
+              display: "flex",
+              flexDirection: "column",
+              gap: "16px"
+            }}>
+              
+              {/* Status */}
+              <div style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "12px",
+                fontSize: "14px",
+                color: scrolledToBottom ? "#10b981" : "#f59e0b",
+                fontWeight: "600"
+              }}>
+                <span style={{ fontSize: "20px" }}>
+                  {scrolledToBottom ? "✓" : "↓"}
+                </span>
+                {scrolledToBottom 
+                  ? "Sözleşmeyi tamamen okudunuz, onaylayabilirsiniz" 
+                  : "Lütfen sözleşmeyi sonuna kadar okuyun"}
+              </div>
+
+              {/* Button */}
               <button
                 onClick={approve}
                 disabled={!scrolledToBottom || approving || approved}
                 style={{
-                  padding: "12px 16px",
-                  borderRadius: 10,
+                  padding: "16px 32px",
+                  borderRadius: "12px",
                   border: "none",
+                  fontSize: "16px",
+                  fontWeight: "700",
                   cursor: !scrolledToBottom || approving || approved ? "not-allowed" : "pointer",
-                  background: !scrolledToBottom || approving || approved ? "#c8c8c8" : "#1a73e8",
+                  background: approved 
+                    ? "#10b981" 
+                    : !scrolledToBottom || approving 
+                      ? "#d1d5db" 
+                      : "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
                   color: "white",
-                  fontWeight: 700,
+                  transition: "all 0.3s ease",
+                  boxShadow: !scrolledToBottom || approving || approved 
+                    ? "none" 
+                    : "0 4px 12px rgba(102, 126, 234, 0.4)",
                 }}
               >
-                {approved ? "Onaylandı" : approving ? "Onaylanıyor..." : "Okudum, Onaylıyorum"}
+                {approved ? "✓ Sözleşme Onaylandı" : approving ? "Onaylanıyor..." : "Sözleşmeyi Onaylıyorum"}
               </button>
 
-              <div style={{ fontSize: 14, color: "#666" }}>
-                {scrolledToBottom ? "Onay aktif." : "Aşağı kaydırıp sonuna ulaşınca onay aktif olur."}
-              </div>
-            </div>
+              {approved && (
+                <div style={{
+                  padding: "16px",
+                  background: "#d1fae5",
+                  borderRadius: "8px",
+                  color: "#065f46",
+                  fontSize: "14px",
+                  textAlign: "center",
+                  fontWeight: "600"
+                }}>
+                  🎉 Sözleşmeniz başarıyla onaylandı. Teşekkür ederiz!
+                </div>
+              )}
 
-            {err && <div style={{ marginTop: 12, color: "#b00020", whiteSpace: "pre-wrap" }}>{err}</div>}
+              {err && (
+                <div style={{ 
+                  padding: "16px",
+                  background: "#fee2e2",
+                  borderRadius: "8px",
+                  color: "#991b1b",
+                  fontSize: "14px",
+                  whiteSpace: "pre-wrap"
+                }}>
+                  {err}
+                </div>
+              )}
+            </div>
           </>
         )}
       </div>
