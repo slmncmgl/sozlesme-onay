@@ -1,3 +1,6 @@
+// State ekle (en üstte)
+const [fullName, setFullName] = useState("");
+
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -80,29 +83,41 @@ export default function ContractPage({ params }: { params: { token: string } }) 
     };
   }, [loading, contract]);
 
-  async function approve() {
-    setApproving(true);
-    setErr(null);
+  // State ekle (en üstte)
+const [fullName, setFullName] = useState("");
 
-    try {
-      const res = await fetch(`/api/approve`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token }),
-      });
-
-      if (!res.ok) {
-        const t = await res.text().catch(() => "");
-        throw new Error(t || `Approve failed (${res.status})`);
-      }
-
-      setApproved(true);
-    } catch (e: any) {
-      setErr(e?.message || "Bilinmeyen hata");
-    } finally {
-      setApproving(false);
-    }
+// approve fonksiyonunu güncelle
+async function approve() {
+  if (!fullName.trim()) {
+    setErr("Lütfen adınızı soyadınızı girin.");
+    return;
   }
+
+  setApproving(true);
+  setErr(null);
+
+  try {
+    const res = await fetch(`/api/approve`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ 
+        token,
+        full_name: fullName.trim()  // ← YENİ!
+      }),
+    });
+
+    if (!res.ok) {
+      const t = await res.text().catch(() => "");
+      throw new Error(t || `Approve failed (${res.status})`);
+    }
+
+    setApproved(true);
+  } catch (e: any) {
+    setErr(e?.message || "Bilinmeyen hata");
+  } finally {
+    setApproving(false);
+  }
+}
 
   const normalizedHtml = useMemo(() => {
     const html = contract?.contract_html ?? "";
@@ -286,7 +301,43 @@ export default function ContractPage({ params }: { params: { token: string } }) 
                   ? "Sözleşmeyi tamamen okudunuz, onaylayabilirsiniz" 
                   : "Lütfen sözleşmeyi sonuna kadar okuyun"}
               </div>
-
+{/* İmza Input - Scroll en alta gelince görünür */}
+{scrolledToBottom && !approved && (
+  <div style={{
+    marginBottom: "16px",
+    padding: "16px",
+    background: "#f0f9ff",
+    borderRadius: "12px",
+    border: "1px solid #bae6fd"
+  }}>
+    <label style={{
+      display: "block",
+      marginBottom: "8px",
+      fontSize: "14px",
+      fontWeight: "600",
+      color: "#0c4a6e"
+    }}>
+      ✍️ İmza (Adınız Soyadınız)
+    </label>
+    <input
+      type="text"
+      value={fullName}
+      onChange={(e) => setFullName(e.target.value)}
+      placeholder="Örn: Ahmet Yılmaz"
+      style={{
+        width: "100%",
+        padding: "12px 16px",
+        borderRadius: "8px",
+        border: "2px solid #bae6fd",
+        fontSize: "15px",
+        outline: "none",
+        transition: "border-color 0.2s"
+      }}
+      onFocus={(e) => e.target.style.borderColor = "#0ea5e9"}
+      onBlur={(e) => e.target.style.borderColor = "#bae6fd"}
+    />
+  </div>
+)}
               {/* Button */}
               <button
                 onClick={approve}
