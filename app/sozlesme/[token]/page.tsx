@@ -2,23 +2,34 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 
+type ContractResp = {
+  contract_html: string;
+  approval_status?: string;
+  contract_version?: string;
+};
+
 export default function ContractPage({ params }: { params: { token: string } }) {
   const token = params.token;
 
   const [loading, setLoading] = useState(true);
-  const [html, setHtml] = useState<string>("");
-  const [error, setError] = useState<string>("");
-  const [canApprove, setCanApprove] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [contract, setContract] = useState<ContractResp | null>(null);
+
+  const [scrolledToBottom, setScrolledToBottom] = useState(false);
+  const [approving, setApproving] = useState(false);
   const [approved, setApproved] = useState(false);
 
-  const boxRef = useRef<HTMLDivElement | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  const title = useMemo(() => "Bilimevi Sözleşme Onayı", []);
 
   useEffect(() => {
     let cancelled = false;
 
-    async function run() {
+    async function load() {
       setLoading(true);
-      setError("");
+      setErr(null);
+
       try {
         const res = await fetch(`/api/contract?token=${encodeURIComponent(token)}`, {
           method: "GET",
@@ -26,42 +37,55 @@ export default function ContractPage({ params }: { params: { token: string } }) 
         });
 
         if (!res.ok) {
-          const txt = await res.text().catch(() => "");
-          throw new Error(txt || `Contract fetch failed (${res.status})`);
+          const t = await res.text().catch(() => "");
+          throw new Error(t || `Contract fetch failed (${res.status})`);
         }
 
-        const data = await res.json();
-        if (!data?.contractHtml) throw new Error("contractHtml missing");
+        const data = (await res.json()) as ContractResp;
 
-        if (!cancelled) setHtml(data.contractHtml);
+        if (!data?.contract_html || typeof data.contract_html !== "string") {
+          throw new Error("contract_html boş veya geçersiz.");
+        }
+
+        if (!cancelled) setContract(data);
       } catch (e: any) {
-        if (!cancelled) setError(e?.message || "Unknown error");
+        if (!cancelled) setErr(e?.message || "Bilinmeyen hata");
       } finally {
         if (!cancelled) setLoading(false);
       }
     }
 
-    run();
-    return () => { cancelled = true; };
+    load();
+    return () => {
+      cancelled = true;
+    };
   }, [token]);
 
   useEffect(() => {
-    const el = boxRef.current;
-    if (!el) return;
-
     function onScroll() {
-      const nearBottom =
-        el.scrollTop + el.clientHeight >= el.scrollHeight - 8; // tolerans
-      if (nearBottom) setCanApprove(true);
+      const el = containerRef.current;
+      if (!el) return;
+
+      const thresholdPx = 12;
+      const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - thresholdPx;
+      setScrolledToBottom(atBottom);
     }
 
-    el.addEventListener("scroll", onScroll);
+    const el = containerRef.current;
+    if (!el) return;
+
+    el.addEventListener("scroll", onScroll, { passive: true });
     onScroll();
-    return () => el.removeEventListener("scroll", onScroll);
-  }, [loading, html]);
+
+    return () => {
+      el.removeEventListener("scroll", onScroll);
+    };
+  }, [loading, contract]);
 
   async function approve() {
-    setError("");
+    setApproving(true);
+    setErr(null);
+
     try {
       const res = await fetch(`/api/approve`, {
         method: "POST",
@@ -70,72 +94,110 @@ export default function ContractPage({ params }: { params: { token: string } }) 
       });
 
       if (!res.ok) {
-        const txt = await res.text().catch(() => "");
-        throw new Error(txt || `Approve failed (${res.status})`);
+        const t = await res.text().catch(() => "");
+        throw new Error(t || `Approve failed (${res.status})`);
       }
 
       setApproved(true);
     } catch (e: any) {
-      setError(e?.message || "Unknown error");
+      setErr(e?.message || "Bilinmeyen hata");
+    } finally {
+      setApproving(false);
     }
   }
 
-  const content = useMemo(() => {
-    if (loading) return <div>Yükleniyor...</div>;
-    if (error) return <div style={{ color: "crimson" }}>Hata: {error}</div>;
+  // ✅ normalize burada: state’ten gelen HTML'i güvenli şekilde ekrana sığdır
+  const normalizedHtml = useMemo(() => {
+    const html = contract?.contract_html ?? "";
+    if (!html) return "";
 
-    return (
-      <div
-        ref={boxRef}
-        style={{
-          height: "70vh",
-          overflow: "auto",
-          border: "1px solid #ddd",
-          borderRadius: 12,
-          padding: 16,
-          background: "#fff",
-        }}
-      >
-        <div dangerouslySetInnerHTML={{ __html: html }} />
-      </div>
-    );
-  }, [loading, error, html]);
+    return html
+      .replace(
+        /<\/head>/i,
+        `<style>
+          html, body { max-width: 100%; overflow-x: hidden; }
+          img, table { max-width: 100% !important; height: auto !important; }
+          * { max-width: 100% !important; box-sizing: border-box; }
+          body { margin: 0; padding: 0; }
+          p, div, span { white-space: normal !important; overflow-wrap: anywhere; word-break: break-word; }
+        </style></head>`
+      )
+      .replace(/width:\s*\d+(px|pt);?/gi, "width:auto;")
+      .replace(/max-width:\s*\d+(px|pt);?/gi, "max-width:100%;");
+  }, [contract?.contract_html]);
 
   return (
-    <main style={{ maxWidth: 920, margin: "24px auto", padding: "0 16px" }}>
-      <h1 style={{ marginBottom: 8 }}>Sözleşme Onayı</h1>
-      <p style={{ marginTop: 0, color: "#555" }}>
-        Aşağı kaydırıp sözleşmeyi okuduktan sonra onaylayabilirsiniz.
-      </p>
+    <div style={{ minHeight: "100vh", background: "#f5f6fa", padding: 24 }}>
+      <div style={{ maxWidth: 900, margin: "0 auto" }}>
+        <h1 style={{ margin: "0 0 8px 0" }}>{title}</h1>
 
-      {content}
+        <div style={{ marginBottom: 12, color: "#666", fontSize: 14 }}>
+          Token: <code>{token}</code>
+        </div>
 
-      <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 16 }}>
-        <button
-          onClick={approve}
-          disabled={!canApprove || approved || loading}
-          style={{
-            padding: "10px 16px",
-            borderRadius: 10,
-            border: "1px solid #111",
-            background: (!canApprove || approved) ? "#eee" : "#111",
-            color: (!canApprove || approved) ? "#666" : "#fff",
-            cursor: (!canApprove || approved) ? "not-allowed" : "pointer",
-          }}
-        >
-          {approved ? "Onaylandı ✅" : "Okudum ve Onaylıyorum"}
-        </button>
+        {loading ? (
+          <div style={{ padding: 16, background: "white", borderRadius: 12 }}>Yükleniyor...</div>
+        ) : err ? (
+          <div style={{ padding: 16, background: "white", borderRadius: 12, border: "1px solid #f2c2c2" }}>
+            <div style={{ color: "#b00020", fontWeight: 600, marginBottom: 8 }}>Hata</div>
+            <div style={{ whiteSpace: "pre-wrap" }}>{err}</div>
+          </div>
+        ) : (
+          <>
+            {/* ✅ Scroll alanı */}
+            <div
+              ref={containerRef}
+              style={{
+                height: "70vh",
+                overflowY: "auto",
+                overflowX: "hidden",
+                background: "white",
+                borderRadius: 12,
+                padding: 16,
+                boxShadow: "0 6px 18px rgba(0,0,0,0.08)",
+                border: "1px solid #eee",
+              }}
+            >
+              <div
+                style={{
+                  width: "100%",
+                  overflowX: "hidden",
+                  wordBreak: "break-word",
+                  overflowWrap: "anywhere",
+                  fontSize: 15,
+                  lineHeight: "24px",
+                }}
+                dangerouslySetInnerHTML={{ __html: normalizedHtml }}
+              />
+            </div>
 
-        {!canApprove && !approved && (
-          <span style={{ color: "#888" }}>
-            Buton, en alta kaydırınca aktif olur.
-          </span>
+            {/* ✅ Buton alanı (scroll container DIŞINDA) */}
+            <div style={{ display: "flex", gap: 12, alignItems: "center", marginTop: 16 }}>
+              <button
+                onClick={approve}
+                disabled={!scrolledToBottom || approving || approved}
+                style={{
+                  padding: "12px 16px",
+                  borderRadius: 10,
+                  border: "none",
+                  cursor: !scrolledToBottom || approving || approved ? "not-allowed" : "pointer",
+                  background: !scrolledToBottom || approving || approved ? "#c8c8c8" : "#1a73e8",
+                  color: "white",
+                  fontWeight: 700,
+                }}
+              >
+                {approved ? "Onaylandı" : approving ? "Onaylanıyor..." : "Okudum, Onaylıyorum"}
+              </button>
+
+              <div style={{ fontSize: 14, color: "#666" }}>
+                {scrolledToBottom ? "Onay aktif." : "Aşağı kaydırıp sonuna ulaşınca onay aktif olur."}
+              </div>
+            </div>
+
+            {err && <div style={{ marginTop: 12, color: "#b00020", whiteSpace: "pre-wrap" }}>{err}</div>}
+          </>
         )}
       </div>
-
-      {error && !loading && (
-        <div style={{ marginTop: 12, color: "crimson" }}>Hata: {error}</div>
-      )}
-    </main>
+    </div>
   );
 }
