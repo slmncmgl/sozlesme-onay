@@ -18,7 +18,7 @@ export default function ContractPage({ params }: { params: { token: string } }) 
   const [scrolledToBottom, setScrolledToBottom] = useState(false);
   const [approving, setApproving] = useState(false);
   const [approved, setApproved] = useState(false);
-  const [fullName, setFullName] = useState("");  // ← YENİ!
+  const [fullName, setFullName] = useState("");
 
   const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -65,8 +65,17 @@ export default function ContractPage({ params }: { params: { token: string } }) 
       const el = containerRef.current;
       if (!el) return;
 
-      const thresholdPx = 20;
+      const thresholdPx = 100;
       const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - thresholdPx;
+      
+      console.log("📊 Scroll Debug:", {
+        scrollTop: el.scrollTop,
+        clientHeight: el.clientHeight,
+        scrollHeight: el.scrollHeight,
+        atBottom,
+        remaining: el.scrollHeight - (el.scrollTop + el.clientHeight)
+      });
+      
       setScrolledToBottom(atBottom);
     }
 
@@ -82,7 +91,7 @@ export default function ContractPage({ params }: { params: { token: string } }) 
   }, [loading, contract]);
 
   async function approve() {
-    if (!fullName.trim()) {  // ← YENİ KONTROL!
+    if (!fullName.trim()) {
       setErr("Lütfen adınızı soyadınızı girin.");
       return;
     }
@@ -96,7 +105,7 @@ export default function ContractPage({ params }: { params: { token: string } }) 
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ 
           token,
-          full_name: fullName.trim()  // ← YENİ PARAMETRE!
+          full_name: fullName.trim()
         }),
       });
 
@@ -202,6 +211,9 @@ export default function ContractPage({ params }: { params: { token: string } }) 
           <p style={{ fontSize: "14px", opacity: 0.9 }}>
             Lütfen sözleşmeyi dikkatle okuyun ve en alta kaydırarak onaylayın
           </p>
+          <p style={{ fontSize: "12px", opacity: 0.7, marginTop: "4px" }}>
+            Token: {token}
+          </p>
         </div>
 
         {loading ? (
@@ -261,6 +273,22 @@ export default function ContractPage({ params }: { params: { token: string } }) 
               gap: "16px"
             }}>
               
+              {/* DEBUG BUTTON */}
+              <button 
+                onClick={() => setScrolledToBottom(true)}
+                style={{
+                  padding: "8px 16px", 
+                  background: "#ef4444", 
+                  color: "white",
+                  border: "none",
+                  borderRadius: "8px",
+                  fontSize: "12px",
+                  cursor: "pointer"
+                }}
+              >
+                🔧 DEBUG: Force Enable (Console'a bak)
+              </button>
+
               <div style={{
                 display: "flex",
                 alignItems: "center",
@@ -277,7 +305,6 @@ export default function ContractPage({ params }: { params: { token: string } }) 
                   : "Lütfen sözleşmeyi sonuna kadar okuyun"}
               </div>
 
-              {/* ✅ İMZA INPUT ALANI - SCROLL EN ALTA GELİNCE GÖRÜNÜR */}
               {scrolledToBottom && !approved && (
                 <div style={{
                   padding: "16px",
