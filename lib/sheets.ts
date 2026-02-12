@@ -10,18 +10,23 @@ const auth = new google.auth.GoogleAuth({
 
 const sheets = google.sheets({ version: 'v4', auth });
 
-// Mevcut yılı dinamik al
-function getCurrentYear(): string {
+// Token'dan yıl çıkar: "2026_NpzraLW" → "2026"
+function getYearFromToken(token: string): string {
+  const parts = token.split('_');
+  if (parts.length >= 2 && /^\d{4}$/.test(parts[0])) {
+    return parts[0];  // "2026"
+  }
+  // Fallback: Eğer token'da yıl yoksa mevcut yılı kullan
   return new Date().getFullYear().toString();
 }
 
 export async function getContractByToken(token: string) {
-  const currentYear = getCurrentYear();
-  const sheetName = currentYear; // "2026", "2027" vs.
+  const year = getYearFromToken(token);
+  const sheetName = year;
   
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId: process.env.GOOGLE_SPREADSHEET_ID,
-    range: `${sheetName}!A2:M1000`,  // Dinamik sekme adı!
+    range: `${sheetName}!A2:M1000`,
   });
 
   const rows = response.data.values || [];
@@ -47,12 +52,12 @@ export async function getContractByToken(token: string) {
 }
 
 export async function updateApprovalStatus(token: string, ip: string, fullName: string) {
-  const currentYear = getCurrentYear();
-  const sheetName = currentYear;
+  const year = getYearFromToken(token);
+  const sheetName = year;
   
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId: process.env.GOOGLE_SPREADSHEET_ID,
-    range: `${sheetName}!A2:A1000`,  // Dinamik sekme adı!
+    range: `${sheetName}!A2:A1000`,
   });
 
   const rows = response.data.values || [];
@@ -62,7 +67,7 @@ export async function updateApprovalStatus(token: string, ip: string, fullName: 
   
   const actualRow = rowIndex + 2;
   
-  // B, C, D kolonları (approval_status, approved_at, approved_ip)
+  // B, C, D kolonları
   await sheets.spreadsheets.values.update({
     spreadsheetId: process.env.GOOGLE_SPREADSHEET_ID,
     range: `${sheetName}!B${actualRow}:D${actualRow}`,
@@ -76,7 +81,7 @@ export async function updateApprovalStatus(token: string, ip: string, fullName: 
     }
   });
   
-  // L kolonu (approved_by)
+  // L kolonu
   await sheets.spreadsheets.values.update({
     spreadsheetId: process.env.GOOGLE_SPREADSHEET_ID,
     range: `${sheetName}!L${actualRow}`,
