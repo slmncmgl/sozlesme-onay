@@ -10,10 +10,18 @@ const auth = new google.auth.GoogleAuth({
 
 const sheets = google.sheets({ version: 'v4', auth });
 
+// Mevcut yılı dinamik al
+function getCurrentYear(): string {
+  return new Date().getFullYear().toString();
+}
+
 export async function getContractByToken(token: string) {
+  const currentYear = getCurrentYear();
+  const sheetName = currentYear; // "2026", "2027" vs.
+  
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId: process.env.GOOGLE_SPREADSHEET_ID,
-    range: 'Sözleşme Onayları!A2:M1000',
+    range: `${sheetName}!A2:M1000`,  // Dinamik sekme adı!
   });
 
   const rows = response.data.values || [];
@@ -39,9 +47,12 @@ export async function getContractByToken(token: string) {
 }
 
 export async function updateApprovalStatus(token: string, ip: string, fullName: string) {
+  const currentYear = getCurrentYear();
+  const sheetName = currentYear;
+  
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId: process.env.GOOGLE_SPREADSHEET_ID,
-    range: 'Sözleşme Onayları!A2:A1000',
+    range: `${sheetName}!A2:A1000`,  // Dinamik sekme adı!
   });
 
   const rows = response.data.values || [];
@@ -51,16 +62,16 @@ export async function updateApprovalStatus(token: string, ip: string, fullName: 
   
   const actualRow = rowIndex + 2;
   
-  // B, C, D, L kolonları (approval_status, approved_at, approved_ip, approved_by)
+  // B, C, D kolonları (approval_status, approved_at, approved_ip)
   await sheets.spreadsheets.values.update({
     spreadsheetId: process.env.GOOGLE_SPREADSHEET_ID,
-    range: `Sözleşme Onayları!B${actualRow}:D${actualRow}`,
+    range: `${sheetName}!B${actualRow}:D${actualRow}`,
     valueInputOption: 'USER_ENTERED',
     requestBody: {
       values: [[
-        'APPROVED',                    // B: approval_status
-        new Date().toISOString(),      // C: approved_at
-        ip                             // D: approved_ip
+        'APPROVED',
+        new Date().toISOString(),
+        ip
       ]]
     }
   });
@@ -68,7 +79,7 @@ export async function updateApprovalStatus(token: string, ip: string, fullName: 
   // L kolonu (approved_by)
   await sheets.spreadsheets.values.update({
     spreadsheetId: process.env.GOOGLE_SPREADSHEET_ID,
-    range: `Sözleşme Onayları!L${actualRow}`,
+    range: `${sheetName}!L${actualRow}`,
     valueInputOption: 'USER_ENTERED',
     requestBody: {
       values: [[fullName]]
